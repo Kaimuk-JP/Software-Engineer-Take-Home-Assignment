@@ -2,7 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { api, ROLE_LABEL, useApi, type DeferralRequest, type Equipment } from '../api'
 import { useCurrentUser } from '../current-user'
+import { DateInput } from '../DateInput'
 import { addDays, daysBetween, formatDate, today } from '../dates'
+
+/** ค่าเดียวกับ CRITICALITY_A_MAX_DEFERRAL_DAYS ใน backend/src/deferral/deferral-policy.ts */
+const CRITICALITY_A_MAX_DEFERRAL_DAYS = 30
 
 export function NewRequestPage() {
   const { currentUser } = useCurrentUser()
@@ -27,6 +31,12 @@ export function NewRequestPage() {
   const cycleOriginal = selected
     ? (selected.cycleOriginalDueDate ?? selected.nextDueDate)
     : null
+  // Criticality A เลื่อนรวมเกิน 30 วันจากกำหนดเดิม: ไม่ให้ยื่นจากหน้าจอ (ตัดสินใจฝั่ง UI)
+  // หมายเหตุ: backend ยังรับคำขอนี้และส่งต่อให้ผู้จัดการฝ่ายตามนโยบาย 4.2
+  const totalDays =
+    cycleOriginal && requestedDueDate ? daysBetween(cycleOriginal, requestedDueDate) : 0
+  const exceedsLimit =
+    selected?.criticality === 'A' && totalDays > CRITICALITY_A_MAX_DEFERRAL_DAYS
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -95,9 +105,10 @@ export function NewRequestPage() {
             )}
             {selected.criticality === 'A' && (
               <div>
-                Criticality A: ถ้าเลื่อนรวมเกิน 30 วันจากกำหนดเดิม
-                (หลัง {formatDate(addDays(cycleOriginal, 30))}) หรือเป็นการเลื่อนครั้งที่ 3
-                ขึ้นไปในรอบนี้ ต้องให้ผู้จัดการฝ่ายอนุมัติ
+                Criticality A: เลื่อนรวมได้ไม่เกิน {CRITICALITY_A_MAX_DEFERRAL_DAYS} วันจากกำหนดเดิม
+                (ไม่เกิน{' '}
+                {formatDate(addDays(cycleOriginal, CRITICALITY_A_MAX_DEFERRAL_DAYS))})
+                ถ้าเป็นการเลื่อนครั้งที่ 3 ขึ้นไปในรอบนี้ ต้องให้ผู้จัดการฝ่ายอนุมัติ
               </div>
             )}
           </div>
@@ -105,16 +116,21 @@ export function NewRequestPage() {
 
         <label>
           วันที่ใหม่
-          <input
-            type="date"
+          <DateInput
             value={requestedDueDate}
             min={minDate}
-            onChange={(e) => setRequestedDueDate(e.target.value)}
+            onChange={setRequestedDueDate}
             required
           />
           {selected && requestedDueDate && (
             <span className="muted small">
               เลื่อนออกไป {daysBetween(selected.nextDueDate, requestedDueDate)} วัน
+            </span>
+          )}
+          {exceedsLimit && (
+            <span className="error small">
+              เลื่อนรวม {totalDays} วันจากกำหนดเดิม เกิน {CRITICALITY_A_MAX_DEFERRAL_DAYS} วัน
+              ยื่นคำขอไม่ได้
             </span>
           )}
         </label>
@@ -130,7 +146,7 @@ export function NewRequestPage() {
           />
         </label>
 
-        <button type="submit" disabled={submitting || !currentUser}>
+        <button type="submit" disabled={submitting || !currentUser || exceedsLimit}>
           {submitting ? 'กำลังส่ง...' : 'ยื่นคำขอ'}
         </button>
       </form>
