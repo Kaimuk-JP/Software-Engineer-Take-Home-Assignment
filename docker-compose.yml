@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16
+    container_name: inspection-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: inspection
+    ports:
+      # แก้จากไฟล์ต้นฉบับ: ให้เปลี่ยน port ฝั่งเครื่องได้ด้วย DB_PORT (ค่าเริ่มต้นยังเป็น 5432)
+      # สำหรับเครื่องที่มี PostgreSQL ตัวอื่นใช้ 5432 อยู่แล้ว
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - ./seed.sql:/docker-entrypoint-initdb.d/01-seed.sql:ro
+      - inspection-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d inspection"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  inspection-data:
+
+# DATABASE_URL:
+#   postgresql://appuser:devpassword@localhost:5432/inspection
+#
+# seed.sql จะถูกรันอัตโนมัติเฉพาะตอนสร้าง volume ครั้งแรกเท่านั้น
+# ถ้าแก้ seed.sql แล้วอยากให้มีผล ให้ล้าง volume ก่อน:
+#   docker compose down -v && docker compose up -d
