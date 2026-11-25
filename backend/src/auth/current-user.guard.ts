@@ -11,15 +11,11 @@ import { AppUser } from '../users/app-user.entity';
 
 export type RequestWithUser = Request & { currentUser?: AppUser };
 
-/**
- * ไม่มีระบบ login ตามโจทย์: อ่าน user ปัจจุบันจาก header X-User-Id
- * แล้วโหลด role จากตาราง app_user
- */
 @Injectable()
 export class CurrentUserGuard implements CanActivate {
   constructor(
     @InjectRepository(AppUser) private readonly users: Repository<AppUser>,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
