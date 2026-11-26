@@ -15,7 +15,7 @@ export type RequestWithUser = Request & { currentUser?: AppUser };
 export class CurrentUserGuard implements CanActivate {
   constructor(
     @InjectRepository(AppUser) private readonly users: Repository<AppUser>,
-  ) { }
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();

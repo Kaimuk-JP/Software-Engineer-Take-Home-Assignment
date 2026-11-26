@@ -8,25 +8,21 @@
  * ไฟล์นี้เป็น pure function ทั้งหมด ไม่แตะฐานข้อมูล เพื่อให้ test ครอบคลุมได้ง่าย
  * การตีความที่เลือกใช้ ดู DECISIONS.docx หัวข้อ 1
  */
+
 import type { Criticality } from '../equipment/equipment.entity';
 import type { UserRole } from '../users/app-user.entity';
 import { daysBetween } from '../common/date-only';
 
 export type ApproverRole = 'supervisor' | 'department_manager';
 
-/** เพดานจำนวนวันที่เลื่อนได้ นับสะสมจากกำหนด ณ ต้นรอบ */
 export const CRITICALITY_A_MAX_DEFERRAL_DAYS = 30;
 
-/** เลื่อนครั้งแรก 1 ครั้ง + เลื่อนซ้ำได้อีก 1 ครั้ง = 2 ครั้งต่อรอบ */
 export const CRITICALITY_A_MAX_DEFERRALS_PER_CYCLE = 2;
 
 export interface DeferralInput {
   criticality: Criticality;
-  /** กำหนดตรวจสอบปัจจุบันของอุปกรณ์ */
   currentDueDate: string;
-  /** กำหนดตรวจสอบ ณ ต้นรอบ (ก่อนการเลื่อนครั้งแรกของรอบนี้) */
   cycleOriginalDueDate: string;
-  /** จำนวนคำขอที่อนุมัติไปแล้วในรอบนี้ */
   approvedDeferralsInCycle: number;
   requestedDueDate: string;
   today: string;
@@ -37,7 +33,6 @@ export type DeferralEvaluation =
   | {
       ok: true;
       requiredApproverRole: ApproverRole;
-      /** เหตุผลที่ต้องให้ผู้จัดการฝ่ายอนุมัติ (ว่างถ้าหัวหน้างานอนุมัติได้) */
       escalationReasons: string[];
     };
 
@@ -94,9 +89,7 @@ export interface DecisionPermissionInput {
  * ตรวจว่าผู้ใช้ตัดสิน (อนุมัติหรือปฏิเสธ) คำขอนี้ได้หรือไม่
  * คืนค่า null ถ้าได้ หรือข้อความเหตุผลถ้าไม่ได้
  */
-export function decisionDeniedReason(
-  input: DecisionPermissionInput,
-): string | null {
+export function whyCannotDecide(input: DecisionPermissionInput): string | null {
   if (input.actorId === input.requesterId) {
     return 'ไม่สามารถตัดสินคำขอของตัวเองได้';
   }
@@ -123,10 +116,10 @@ export interface DeciderCheckInput {
  * ถ้ารับไว้ คำขอจะค้างเป็น PENDING ตลอดไปและอุปกรณ์ยื่นคำขอใหม่ไม่ได้
  * คืนค่า null ถ้ามีผู้ตัดสินได้ หรือข้อความเหตุผลถ้าไม่มี
  */
-export function noDeciderReason(input: DeciderCheckInput): string | null {
+export function whyNoOneCanDecide(input: DeciderCheckInput): string | null {
   const someoneCanDecide = input.users.some(
     (user) =>
-      decisionDeniedReason({
+      whyCannotDecide({
         actorId: user.id,
         actorRole: user.role,
         requesterId: input.requesterId,

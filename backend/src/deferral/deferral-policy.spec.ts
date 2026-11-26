@@ -1,8 +1,8 @@
 import {
   DeferralInput,
-  decisionDeniedReason,
   evaluateDeferral,
-  noDeciderReason,
+  whyCannotDecide,
+  whyNoOneCanDecide,
 } from './deferral-policy';
 
 const TODAY = '2026-03-01';
@@ -190,12 +190,12 @@ describe('evaluateDeferral - นโยบายหมวด 4.2', () => {
   });
 });
 
-describe('decisionDeniedReason - ใครตัดสินคำขอได้', () => {
+describe('whyCannotDecide - ใครตัดสินคำขอได้', () => {
   const base = { actorId: 3, requesterId: 1 };
 
   it('หัวหน้างานตัดสินคำขอปกติได้', () => {
     expect(
-      decisionDeniedReason({
+      whyCannotDecide({
         ...base,
         actorRole: 'supervisor',
         requiredApproverRole: 'supervisor',
@@ -205,7 +205,7 @@ describe('decisionDeniedReason - ใครตัดสินคำขอได�
 
   it('หัวหน้างานตัดสินคำขอที่เกินเงื่อนไขไม่ได้', () => {
     expect(
-      decisionDeniedReason({
+      whyCannotDecide({
         ...base,
         actorRole: 'supervisor',
         requiredApproverRole: 'department_manager',
@@ -217,7 +217,7 @@ describe('decisionDeniedReason - ใครตัดสินคำขอได�
     'ผู้จัดการฝ่ายตัดสินคำขอที่ต้องการ %s ได้',
     (requiredApproverRole) => {
       expect(
-        decisionDeniedReason({
+        whyCannotDecide({
           ...base,
           actorId: 5,
           actorRole: 'department_manager',
@@ -229,7 +229,7 @@ describe('decisionDeniedReason - ใครตัดสินคำขอได�
 
   it('ผู้ยื่นคำขอ (requester) ตัดสินไม่ได้', () => {
     expect(
-      decisionDeniedReason({
+      whyCannotDecide({
         ...base,
         actorId: 2,
         actorRole: 'requester',
@@ -240,7 +240,7 @@ describe('decisionDeniedReason - ใครตัดสินคำขอได�
 
   it('ห้ามตัดสินคำขอของตัวเอง แม้เป็นผู้จัดการฝ่าย', () => {
     expect(
-      decisionDeniedReason({
+      whyCannotDecide({
         actorId: 5,
         requesterId: 5,
         actorRole: 'department_manager',
@@ -250,7 +250,7 @@ describe('decisionDeniedReason - ใครตัดสินคำขอได�
   });
 });
 
-describe('noDeciderReason - ต้องมีคนอื่นที่ตัดสินคำขอได้', () => {
+describe('whyNoOneCanDecide - ต้องมีคนอื่นที่ตัดสินคำขอได้', () => {
   // ผู้ใช้ตาม seed.sql: ผู้จัดการฝ่ายมีคนเดียว (id 5)
   const users = [
     { id: 1, role: 'requester' },
@@ -261,7 +261,7 @@ describe('noDeciderReason - ต้องมีคนอื่นที่ตั�
 
   it('ผู้จัดการฝ่ายคนเดียวยื่นคำขอที่เกินเงื่อนไข: ไม่มีใครตัดสินได้', () => {
     expect(
-      noDeciderReason({
+      whyNoOneCanDecide({
         requesterId: 5,
         requiredApproverRole: 'department_manager',
         users: [...users],
@@ -271,7 +271,7 @@ describe('noDeciderReason - ต้องมีคนอื่นที่ตั�
 
   it('ผู้จัดการฝ่ายยื่นคำขอปกติ: หัวหน้างานตัดสินได้', () => {
     expect(
-      noDeciderReason({
+      whyNoOneCanDecide({
         requesterId: 5,
         requiredApproverRole: 'supervisor',
         users: [...users],
@@ -281,7 +281,7 @@ describe('noDeciderReason - ต้องมีคนอื่นที่ตั�
 
   it('มีผู้จัดการฝ่ายคนอื่น: ยื่นคำขอที่เกินเงื่อนไขได้', () => {
     expect(
-      noDeciderReason({
+      whyNoOneCanDecide({
         requesterId: 5,
         requiredApproverRole: 'department_manager',
         users: [...users, { id: 6, role: 'department_manager' }],
@@ -291,7 +291,7 @@ describe('noDeciderReason - ต้องมีคนอื่นที่ตั�
 
   it('หัวหน้างานยื่นคำขอปกติ: หัวหน้างานอีกคนหรือผู้จัดการฝ่ายตัดสินได้', () => {
     expect(
-      noDeciderReason({
+      whyNoOneCanDecide({
         requesterId: 3,
         requiredApproverRole: 'supervisor',
         users: [...users],

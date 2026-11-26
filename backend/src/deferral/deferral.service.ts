@@ -12,9 +12,9 @@ import { Equipment } from '../equipment/equipment.entity';
 import { AppUser } from '../users/app-user.entity';
 import {
   ApproverRole,
-  decisionDeniedReason,
   evaluateDeferral,
-  noDeciderReason,
+  whyCannotDecide,
+  whyNoOneCanDecide,
 } from './deferral-policy';
 import { DeferralRequest } from './deferral-request.entity';
 import { CreateDeferralRequestDto } from './deferral.dto';
@@ -53,20 +53,16 @@ export class DeferralService {
           );
         }
 
-        const cycle = await this.currentCycle(manager, equipment);
-        const evaluation = evaluateDeferral({
-          criticality: equipment.criticality,
-          currentDueDate: equipment.nextDueDate,
-          cycleOriginalDueDate: cycle.originalDueDate,
-          approvedDeferralsInCycle: cycle.approvedCount,
-          requestedDueDate: dto.requestedDueDate,
-          today: this.clock.today(),
-        });
+        const { cycle, evaluation } = await this.evaluate(
+          manager,
+          equipment,
+          dto.requestedDueDate,
+        );
         if (!evaluation.ok) {
           throw new BadRequestException(evaluation.error);
         }
 
-        const noDecider = noDeciderReason({
+        const noDecider = whyNoOneCanDecide({
           requesterId: actor.id,
           requiredApproverRole: evaluation.requiredApproverRole,
           users: await manager.find(AppUser, {
@@ -112,16 +108,13 @@ export class DeferralService {
       order: { createdAt: 'ASC', id: 'ASC' },
     });
     return requests.map((r) => {
-      const reason = decisionDeniedReason({
+      const reason = whyCannotDecide({
         actorId: actor.id,
         actorRole: actor.role,
         requesterId: r.requestedById,
         requiredApproverRole: r.requiredApproverRole,
       });
-      return Object.assign(r, {
-        canDecide: reason === null,
-        cannotDecideReason: reason,
-      });
+      return { ...r, canDecide: reason === null, cannotDecideReason: reason };
     });
   }
 
@@ -143,15 +136,11 @@ export class DeferralService {
       }
 
       // ตรวจนโยบาย 4.2 ซ้ำตอนอนุมัติ ด้วยข้อมูลล่าสุดที่ล็อกไว้แล้ว
-      const cycle = await this.currentCycle(manager, equipment);
-      const evaluation = evaluateDeferral({
-        criticality: equipment.criticality,
-        currentDueDate: equipment.nextDueDate,
-        cycleOriginalDueDate: cycle.originalDueDate,
-        approvedDeferralsInCycle: cycle.approvedCount,
-        requestedDueDate: request.requestedDueDate,
-        today: this.clock.today(),
-      });
+      const { cycle, evaluation } = await this.evaluate(
+        manager,
+        equipment,
+        request.requestedDueDate,
+      );
       if (!evaluation.ok) {
         throw new ConflictException(
           `คำขอนี้ไม่ผ่านเงื่อนไขแล้ว: ${evaluation.error} (ให้ปฏิเสธแล้วยื่นใหม่)`,
@@ -260,12 +249,33 @@ export class DeferralService {
     return { originalDueDate, approvedCount };
   }
 
+  /**
+   * ตรวจนโยบาย 4.2 กับรอบปัจจุบันของอุปกรณ์
+   * ใช้ทั้งตอนยื่นและตอนอนุมัติ เพื่อให้ทั้งสองจุดใช้กฎชุดเดียวกัน
+   */
+  private async evaluate(
+    manager: EntityManager,
+    equipment: Equipment,
+    requestedDueDate: string,
+  ) {
+    const cycle = await this.currentCycle(manager, equipment);
+    const evaluation = evaluateDeferral({
+      criticality: equipment.criticality,
+      currentDueDate: equipment.nextDueDate,
+      cycleOriginalDueDate: cycle.originalDueDate,
+      approvedDeferralsInCycle: cycle.approvedCount,
+      requestedDueDate,
+      today: this.clock.today(),
+    });
+    return { cycle, evaluation };
+  }
+
   private assertCanDecide(
     actor: AppUser,
     request: DeferralRequest,
     requiredApproverRole: ApproverRole,
   ): void {
-    const denied = decisionDeniedReason({
+    const denied = whyCannotDecide({
       actorId: actor.id,
       actorRole: actor.role,
       requesterId: request.requestedById,
